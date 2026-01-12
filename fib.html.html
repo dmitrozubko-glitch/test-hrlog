@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>FIB HRB System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{margin:0;font-family:Arial;background:#0b0e14;color:#e6e6e6}
+header{background:#111622;padding:15px;text-align:center;font-size:22px;border-bottom:2px solid #1f2537}
+.panel{padding:20px}
+input,select,button{
+background:#111622;color:#e6e6e6;border:1px solid #1f2537;
+padding:8px;border-radius:6px;margin:5px
+}
+button{cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th,td{border:1px solid #1f2537;padding:8px;text-align:center}
+th{background:#111622}
+.log{background:#111622;padding:10px;height:120px;overflow:auto;margin-top:15px;border:1px solid #1f2537}
+.hidden{display:none}
+.role{color:#4fc3ff}
+</style>
+</head>
+<body>
+
+<header>🕵️ FIB HRB CONTROL PANEL</header>
+
+<div class="panel" id="loginPanel">
+<h3>Login</h3>
+<input id="loginInput" placeholder="Login">
+<input id="passwordInput" type="password" placeholder="Password">
+<button id="loginBtn">Enter</button>
+</div>
+
+<div class="panel hidden" id="system">
+<h3>Welcome: <span id="userRole" class="role"></span></h3>
+
+<div id="headControls" class="hidden">
+<h4>Add employee</h4>
+<input id="s" placeholder="Static">
+<input id="n" placeholder="Name">
+<input id="r" placeholder="Rank">
+<input id="d" placeholder="Division">
+<button id="addBtn">Add</button>
+</div>
+
+<div id="passwordPanel" class="hidden">
+<h4>🔐 Change account passwords</h4>
+<select id="roleSelect">
+<option value="deputy">Deputy Head HRB</option>
+<option value="hr">HR</option>
+</select>
+<input id="newPass" type="password" placeholder="New password">
+<button onclick="changePassword()">Change</button>
+
+<hr style="border:1px solid #1f2537;margin:10px 0">
+
+<h4>➕ Create HR account</h4>
+<input id="newHrLogin" placeholder="HR Login">
+<input id="newHrPass" type="password" placeholder="HR Password">
+<button onclick="createHR()">Create HR</button>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Static</th><th>Name</th><th>Rank</th><th>Division</th><th>Status</th><th>HR Note</th><th>Action</th>
+</tr>
+</thead>
+<tbody id="table"></tbody>
+</table>
+
+<h4>HR LOG</h4>
+<div class="log" id="log"></div>
+
+<h4>LOGIN LOG</h4>
+<div class="log" id="loginLog"></div>
+
+</div>
+
+<script>
+let users = JSON.parse(localStorage.getItem("fib_users")) || {
+  head: { pass: "head123", role: "Head HRB" },
+  deputy: { pass: "deputy123", role: "Deputy Head HRB" },
+  hr: { pass: "hr123", role: "HR" }
+};
+
+let currentRole = "";
+let data = JSON.parse(localStorage.getItem("fib")) || [];
+let logs = JSON.parse(localStorage.getItem("logs")) || [];
+let loginLogs = JSON.parse(localStorage.getItem("login_logs")) || [];
+
+// DOM
+const loginInput = document.getElementById("loginInput");
+const passwordInput = document.getElementById("passwordInput");
+const loginBtn = document.getElementById("loginBtn");
+const loginPanel = document.getElementById("loginPanel");
+const system = document.getElementById("system");
+const userRole = document.getElementById("userRole");
+const headControls = document.getElementById("headControls");
+const table = document.getElementById("table");
+const logBox = document.getElementById("log");
+const loginLogBox = document.getElementById("loginLog");
+const passwordPanel = document.getElementById("passwordPanel");
+
+loginBtn.addEventListener("click", login);
+
+function save(){
+  localStorage.setItem("fib", JSON.stringify(data));
+  localStorage.setItem("logs", JSON.stringify(logs));
+  localStorage.setItem("login_logs", JSON.stringify(loginLogs));
+}
+
+function saveUsers(){
+  localStorage.setItem("fib_users", JSON.stringify(users));
+}
+
+function login(){
+  const l = loginInput.value.trim();
+  const p = passwordInput.value.trim();
+
+  if(users[l] && users[l].pass === p){
+    currentRole = users[l].role;
+    loginPanel.classList.add("hidden");
+    system.classList.remove("hidden");
+    userRole.textContent = currentRole;
+
+    if(currentRole === "Head HRB"){
+      headControls.classList.remove("hidden");
+      passwordPanel.classList.remove("hidden");
+    }
+
+    if(currentRole === "Deputy Head HRB"){
+      passwordPanel.classList.remove("hidden");
+    }
+
+    loginLogs.push(`${new Date().toLocaleString()} | ${l} | ${currentRole}`);
+    save();
+    render();
+  } else {
+    alert("Wrong login or password");
+  }
+}
+
+document.getElementById("addBtn").addEventListener("click", ()=>{
+  const s = document.getElementById("s").value;
+  const n = document.getElementById("n").value;
+  const r = document.getElementById("r").value;
+  const d = document.getElementById("d").value;
+
+  if(!s || !n || !r || !d) return alert("Fill all fields");
+
+  data.push({ s, n, r: parseInt(r), d, st: "Active", note: "" });
+  logs.push(`${new Date().toLocaleString()} Head added ${s}`);
+  save();
+  render();
+});
+
+function changePassword(){
+  let role = document.getElementById("roleSelect").value;
+  let pass = document.getElementById("newPass").value;
+
+  if(pass.length < 4) return alert("Password too short");
+
+  users[role].pass = pass;
+  saveUsers();
+
+  logs.push(`${new Date().toLocaleString()} ${currentRole} changed password for ${users[role].role}`);
+  save();
+  render();
+
+  alert("Password changed");
+}
+
+function createHR(){
+  if(currentRole !== "Deputy Head HRB" && currentRole !== "Head HRB"){
+    return alert("No access");
+  }
+
+  let login = document.getElementById("newHrLogin").value.trim();
+  let pass = document.getElementById("newHrPass").value.trim();
+
+  if(!login || !pass) return alert("Fill all fields");
+  if(users[login]) return alert("Login already exists");
+
+  users[login] = { pass: pass, role: "HR" };
+  saveUsers();
+
+  logs.push(`${new Date().toLocaleString()} ${currentRole} created HR account ${login}`);
+  save();
+  render();
+
+  alert("HR account created");
+}
+
+function render(){
+  table.innerHTML = "";
+  data.forEach((e,i)=>{
+    if(currentRole === "HR" && e.d !== "HRB") return;
+
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${e.s}</td>
+      <td>${e.n}</td>
+      <td>${e.r}</td>
+      <td>${e.d}</td>
+      <td>${e.st}</td>
+      <td><input value="${e.note}" data-i="${i}" class="note"></td>
+      <td>
+        ${currentRole !== "HR" ? `<button onclick="promote(${i})">+</button>` : ""}
+        ${currentRole === "Head HRB" ? `<button onclick="fireEmp(${i})">X</button>` : ""}
+      </td>
+    `;
+    table.appendChild(tr);
+  });
+
+  logBox.innerHTML = logs.join("<br>");
+  loginLogBox.innerHTML = loginLogs.join("<br>");
+
+  document.querySelectorAll(".note").forEach(inp=>{
+    inp.addEventListener("change", e=>{
+      data[e.target.dataset.i].note = e.target.value;
+      save();
+    });
+  });
+}
+
+function promote(i){
+  data[i].r++;
+  logs.push(`${new Date().toLocaleString()} promoted ${data[i].s}`);
+  save();
+  render();
+}
+
+function fireEmp(i){
+  logs.push(`${new Date().toLocaleString()} fired ${data[i].s}`);
+  data.splice(i,1);
+  save();
+  render();
+}
+</script>
+
+</body>
+</html>
